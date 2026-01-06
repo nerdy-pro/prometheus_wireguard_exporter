@@ -14,6 +14,7 @@ pub use friendly_description::*;
 use wireguard::WireGuard;
 mod exporter_error;
 mod wireguard_config;
+use crate::options::WiregaurdType;
 use prometheus_exporter_base::render_prometheus;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -50,17 +51,22 @@ async fn perform_request(
     trace!("peer_entry_hashmap == {:#?}", peer_entry_hashmap);
 
     let mut wg_accumulator: Option<WireGuard> = None;
+    
+    let binary = match options.wg_type {
+        WiregaurdType::Wireguard => "wg",
+        WiregaurdType::AmneziaWG => "awg",
+    };
 
     for interface_to_handle in interfaces_to_handle {
         let output = if options.prepend_sudo {
             Command::new("sudo")
-                .arg("wg")
+                .arg(binary)
                 .arg("show")
                 .arg(&interface_to_handle)
                 .arg("dump")
                 .output()?
         } else {
-            Command::new("wg")
+            Command::new(binary)
                 .arg("show")
                 .arg(&interface_to_handle)
                 .arg("dump")
@@ -69,13 +75,15 @@ async fn perform_request(
 
         let output_stdout_str = String::from_utf8(output.stdout)?;
         trace!(
-            "wg show {} dump stdout == {}",
+            "{} show {} dump stdout == {}",
+            binary,
             interface_to_handle,
             output_stdout_str
         );
         let output_stderr_str = String::from_utf8(output.stderr)?;
         trace!(
-            "wg show {} dump stderr == {}",
+            "{} show {} dump stderr == {}",
+            binary,
             interface_to_handle,
             output_stderr_str
         );
@@ -86,7 +94,7 @@ async fn perform_request(
         // column less in the second case). We solve this prepending the interface name in every
         // line so the output of the second case will be equal to the first case.
         let output_stdout_str = if interface_to_handle != "all" {
-            debug!("injecting {} to the wg show output", interface_to_handle);
+            debug!("injecting {} to the {} show output", interface_to_handle, binary);
             let mut result = String::new();
             for s in output_stdout_str.lines() {
                 result.push_str(&format!("{}\t{}\n", interface_to_handle, s));
@@ -116,6 +124,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let matches = clap::Command::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!("\n"))
+        .arg(
+            Arg::new("wg_type")
+                .short('t')
+                .long("wg-type")
+                .env("WG_TYPE")
+                .value_parser(value_parser!(WiregaurdType))
+                .help("Wireguard type to use. Can be either 'wireguard' or 'awg'")
+                .default_value("wireguard")
+        )
         .arg(
             Arg::new("addr")
                 .short('l')

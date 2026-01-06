@@ -1,5 +1,5 @@
 use crate::exporter_error::ExporterError;
-use crate::options::Options;
+use crate::options::{Options, WiregaurdType, WireguardLineParser};
 use crate::wireguard_config::PeerEntryHashMap;
 use crate::FriendlyDescription;
 use log::{debug, trace};
@@ -94,7 +94,7 @@ impl TryFrom<&str> for WireGuard {
             let v: Vec<&str> = line.split('\t').filter(|s| !s.is_empty()).collect();
             debug!("WireGuard::try_from v == {:?}", v);
 
-            let endpoint = if v.len() == 5 {
+            let endpoint = if v.len() == 5 || v.len() == 14 {
                 // this is the local interface
                 Endpoint::Local(LocalEndpoint {
                     public_key: v[1].to_owned(),
@@ -365,8 +365,9 @@ impl WireGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::options::WiregaurdType;
 
-    const TEXT : &'static str = "wg0\t000q4qAC0ExW/BuGSmVR1nxH9JAXT6g9Wd3oEGy5lA=\t0000u8LWR682knVm350lnuqlCJzw5SNLW9Nf96P+m8=\t51820\toff
+    const TEXT_WG: &'static str = "wg0\t000q4qAC0ExW/BuGSmVR1nxH9JAXT6g9Wd3oEGy5lA=\t0000u8LWR682knVm350lnuqlCJzw5SNLW9Nf96P+m8=\t51820\toff
 wg0\t2S7mA0vEMethCNQrJpJKE81/JmhgtB+tHHLYQhgM6kk=\t(none)\t37.159.76.245:29159\t10.70.0.2/32,10.70.0.66/32\t1555771458\t10288508\t139524160\toff
 wg0\tqnoxQoQI8KKMupLnSSureORV0wMmH7JryZNsmGVISzU=\t(none)\t(none)\t10.70.0.3/32\t0\t0\t0\toff
 wg0\tL2UoJZN7RmEKsMmqaJgKG0m1S2Zs2wd2ptAf+kb3008=\t(none)\t(none)\t10.70.0.4/32\t0\t0\t0\toff
@@ -433,6 +434,7 @@ wg0\tsUsR6xufQQ8Tf0FuyY9tfEeYdhVMeFelr4ZMUrj+B0E=\t(none)\t10.211.123.128:51820\
 
         let options = Options {
             verbose: true,
+            wg_type: WiregaurdType::Wireguard,
             prepend_sudo: true,
             separate_allowed_ips: true,
             extract_names_config_files: None,
@@ -509,7 +511,7 @@ wireguard_latest_handshake_seconds{interface=\"wg0\",public_key=\"sUsR6xufQQ8Tf0
 
     #[test]
     fn test_parse() {
-        let a = WireGuard::try_from(TEXT).unwrap();
+        let a = WireGuard::try_from(TEXT_WG).unwrap();
         println!("{:?}", a);
         assert!(a.interfaces.len() == 3);
         assert!(a.interfaces["wg0"].len() == 6);
@@ -530,10 +532,11 @@ wireguard_latest_handshake_seconds{interface=\"wg0\",public_key=\"sUsR6xufQQ8Tf0
 
     #[test]
     fn test_parse_and_serialize() {
-        let a = WireGuard::try_from(TEXT).unwrap();
+        let a = WireGuard::try_from(TEXT_WG).unwrap();
 
         let options = Options {
             verbose: true,
+            wg_type: WiregaurdType::Wireguard,
             prepend_sudo: true,
             separate_allowed_ips: false,
             extract_names_config_files: None,
@@ -569,6 +572,7 @@ wireguard_latest_handshake_seconds{interface=\"wg0\",public_key=\"sUsR6xufQQ8Tf0
 
         let options = Options {
             verbose: true,
+            wg_type: WiregaurdType::Wireguard,
             prepend_sudo: true,
             separate_allowed_ips: false,
             extract_names_config_files: None,
@@ -635,6 +639,7 @@ wireguard_latest_handshake_seconds{interface=\"wg0\",public_key=\"sUsR6xufQQ8Tf0
         let mut options = Options {
             verbose: true,
             prepend_sudo: true,
+            wg_type: WiregaurdType::Wireguard,
             separate_allowed_ips: false,
             extract_names_config_files: None,
             interfaces: None,

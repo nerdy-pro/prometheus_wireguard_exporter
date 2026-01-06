@@ -1,8 +1,23 @@
 use clap::parser::ValuesRef;
 
+#[derive(Debug, Clone, clap::ValueEnum, Copy)]
+pub(crate) enum WiregaurdType {
+    #[value(name = "wireguard")]
+    Wireguard,
+    #[value(name = "awg")]
+    AmneziaWG,
+}
+
+pub trait WireguardLineParser : Default {
+    fn is_header(&self) -> bool;
+    fn parse_line(&self, line: &str) -> Option<(String, String)>;
+}
+
+
 #[derive(Debug, Clone)]
 pub(crate) struct Options {
     pub verbose: bool,
+    pub wg_type: WiregaurdType,
     pub prepend_sudo: bool,
     pub separate_allowed_ips: bool,
     pub extract_names_config_files: Option<Vec<String>>,
@@ -14,6 +29,9 @@ pub(crate) struct Options {
 impl Options {
     pub fn from_claps(matches: &clap::ArgMatches) -> Options {
         let options = Options {
+            wg_type: *matches
+                .get_one("wg_type")
+                .unwrap_or(&WiregaurdType::Wireguard),
             verbose: *matches.get_one("verbose").unwrap_or(&false),
             prepend_sudo: *matches.get_one("prepend_sudo").unwrap_or(&false),
             separate_allowed_ips: *matches.get_one("separate_allowed_ips").unwrap_or(&false),
